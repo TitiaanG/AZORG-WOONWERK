@@ -4,23 +4,20 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AZORG — Woon‑werkverkeer calculator (adressen)</title>
+  <title>AZORG — Woon‑werkverkeer calculator</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
     h1, h2 { margin: 0 0 12px; }
     .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
     label { display: block; font-weight: 600; margin-bottom: 6px; }
-    input[type="text"], input[type="password"] {
+    .field { margin-bottom: 12px; }
+    input[type="password"], input[type="text"] {
       width: 100%; padding: 10px; border: 1px solid #bbb; border-radius: 6px;
     }
-    .field { margin-bottom: 12px; }
-    .key-row { display: flex; gap: 8px; align-items: center; }
-    .key-row button { padding: 10px 12px; border: none; border-radius: 6px; background: #0058b0; color: #fff; cursor: pointer; }
-    .key-row button:disabled { background: #9bb8db; cursor: not-allowed; }
-
-    button.primary { padding: 10px 16px; border: none; border-radius: 6px; background: #0058b0; color: #fff; cursor: pointer; }
+    button.primary {
+      padding: 10px 16px; border: none; border-radius: 6px; background: #0058b0; color: #fff; cursor: pointer;
+    }
     button.primary:disabled { background: #9bb8db; cursor: not-allowed; }
-
     table { width: 100%; border-collapse: collapse; margin-top: 16px; }
     th, td { border: 1px solid #e6e6e6; padding: 10px; text-align: left; vertical-align: top; }
     th { background: #f7f8fa; }
@@ -37,21 +34,16 @@
   </header>
 
   <section class="card">
-    <!-- VERTICALE LAYOUT: velden onder elkaar -->
     <div class="field">
       <label for="apiKey">OpenRouteService API‑key</label>
-      <div class="key-row">
-        <!-- type="password" zorgt voor sterretjes/bolletjes -->
-        <input id="apiKey" type="password" autocomplete="off" />
-        <button id="toggleKey" type="button" aria-label="Toon/verberg API-key">Toon</button>
-      </div>
+      <input id="apiKey" type="password"
+             value="eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0=" />
     </div>
     <div class="field">
       <label for="origin">Je vertrekadres</label>
       <input id="origin" type="text" placeholder="bv. Stationsstraat 1, 9300 Aalst" />
     </div>
-
-    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;">
+    <div style="margin-top:12px;">
       <button id="btnGeocodeOrigin" class="primary">Geocodeer vertrekadres</button>
       <button id="btnCalculate" class="primary" disabled>Bereken</button>
     </div>
@@ -80,51 +72,32 @@
           <th>Vergoeding fiets (heen + terug)</th>
         </tr>
       </thead>
-      <tbody>
-        <!-- rijen worden dynamisch ingevuld -->
-      </tbody>
+      <tbody></tbody>
     </table>
     <div id="errors"></div>
   </section>
 
   <script>
-    // === Config ===
-    // Key is standaard gezet maar wordt GEMASKEERD weergegeven (type="password").
-    const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0=";
-    const AUTO_TARIEF = 0.4449; // €/km (enkel heen, vanaf 4 km)
-    const FIETS_TARIEF = 0.3600; // €/km (heen + terug)
+    const AUTO_TARIEF = 0.4449;
+    const FIETS_TARIEF = 0.3600;
     const MIN_AUTO_KM = 4.0;
 
-    // === Correcte adressen (enkel adres wordt getoond) ===
     const campussen = [
-      { adres: 'Moorselbaan 164, 9300 Aalst' },           // Campus Moorselbaan
-      { adres: 'Merestraat 80, 9300 Aalst' },             // Campus Merestraat
-      { adres: 'Bloklaan 5, 1730 Asse' },                 // Campus Asse
-      { adres: 'Gasthuisstraat 4, 9500 Geraardsbergen' }, // Campus Geraardsbergen
-      { adres: 'Biezenstraat 2, 9400 Ninove' },           // Campus Ninove
-      { adres: 'Wegvoeringstraat 73, 9230 Wetteren' }     // Campus Wetteren
+      { adres: 'Moorselbaan 164, 9300 Aalst' },
+      { adres: 'Merestraat 80, 9300 Aalst' },
+      { adres: 'Bloklaan 5, 1730 Asse' },
+      { adres: 'Gasthuisstraat 4, 9500 Geraardsbergen' },
+      { adres: 'Biezenstraat 2, 9400 Ninove' },
+      { adres: 'Wegvoeringstraat 73, 9230 Wetteren' }
     ];
 
-    // === Helpers ===
     const elApiKey = document.getElementById('apiKey');
-    const elToggleKey = document.getElementById('toggleKey');
     const elOrigin = document.getElementById('origin');
     const elBtnGeo = document.getElementById('btnGeocodeOrigin');
     const elBtnCalc = document.getElementById('btnCalculate');
     const elTBody = document.querySelector('#results tbody');
     const elErrors = document.getElementById('errors');
 
-    // Prefill API key (blijft gemaskeerd omdat input type="password" is)
-    elApiKey.value = ORS_API_KEY;
-
-    // Toon/verberg key (voor controle zonder tekens te tonen standaard)
-    elToggleKey.addEventListener('click', () => {
-      const isPassword = elApiKey.type === 'password';
-      elApiKey.type = isPassword ? 'text' : 'password';
-      elToggleKey.textContent = isPassword ? 'Verberg' : 'Toon';
-    });
-
-    // Tabel initieel vullen met adressen (geen labels)
     function renderInitialTable() {
       elTBody.innerHTML = '';
       campussen.forEach((c, idx) => {
@@ -154,7 +127,6 @@
       setTimeout(() => div.remove(), 8000);
     }
 
-    // === ORS Geocoding ===
     async function geocode(text, apiKey) {
       const url = 'https://api.openrouteservice.org/geocode/search';
       const params = new URLSearchParams({ text, size: '1', lang: 'nl' }).toString();
@@ -166,10 +138,9 @@
       const feat = data.features?.[0];
       if (!feat) throw new Error('Geen geocode‑resultaat gevonden');
       const [lon, lat] = feat.geometry.coordinates;
-      return { lat, lon, label: feat.properties.label || text };
+      return { lat, lon };
     }
 
-    // === ORS Routing ===
     async function route(origin, destination, profile, apiKey) {
       const url = `https://api.openrouteservice.org/v2/directions/${profile}`;
       const body = {
@@ -205,7 +176,6 @@
     function calcFietsVergoeding(km) { return km * 2 * FIETS_TARIEF; }
     function euro(x) { return `€ ${x.toFixed(2).replace('.', ',')}`; }
 
-    // === Events ===
     elBtnGeo.addEventListener('click', async () => {
       elBtnGeo.disabled = true;
       elBtnCalc.disabled = true;
@@ -227,11 +197,9 @@
       elBtnCalc.disabled = true;
       try {
         const apiKey = (elApiKey.value || '').trim();
-        if (!apiKey) throw new Error('Vul je OpenRouteService API‑key in.');
         const origin = window.__origin;
         if (!origin) throw new Error('Geocodeer eerst je vertrekadres.');
 
-        // Geocode alle campussen op basis van adres
         const dests = [];
         for (const c of campussen) {
           try {
@@ -242,12 +210,10 @@
           }
         }
 
-        // Bereken routes en vul tabel
         const rows = Array.from(elTBody.querySelectorAll('tr'));
         for (let i = 0; i < dests.length; i++) {
           const row = rows[i];
           const dest = dests[i];
-
           const tdAuto = row.querySelector('.auto');
           const tdFiets = row.querySelector('.fiets');
           const tdAutoVer = row.querySelector('.autoVergoeding');
@@ -262,7 +228,6 @@
             continue;
           }
 
-          // Auto
           try {
             const ra = await route(origin, dest.geo, 'driving-car', apiKey);
             const kmA = parseFloat(formatKm(ra.meters));
@@ -274,7 +239,6 @@
             showError(`Route (auto) mislukt voor: ${dest.adres} (${e.message})`);
           }
 
-          // Fiets
           try {
             const rf = await route(origin, dest.geo, 'cycling-regular', apiKey);
             const kmF = parseFloat(formatKm(rf.meters));
