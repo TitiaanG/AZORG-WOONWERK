@@ -7,30 +7,59 @@
 <title>AZORG-WOONWERK — Woon-werkverkeer calculator (6 campussen)</title>
 
 <!-- Leaflet voor kaart (jsDelivr CDN) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/ system-ui, Arial, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
-  h1 { font-size: 1.4rem; }
-  .row { display: flex; gap: 0.8rem; margin: 0.6rem 0; align-items: center; }
-  input[type=text] { flex: 1; padding: 0.6rem; font-size: 1rem; }
+https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css
+
+<style>
+  :root {
+    --azorg-blue: #0078D7; /* auto-route kleur */
+    --azorg-green: #2E7D32; /* fiets-route kleur */
+    --border: #ddd;
+  }
+  body { font-family: system-ui, Arial, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+  header.app-header {
+    display: flex; align-items: center; gap: 1rem;
+    border-bottom: 1px solid var(--border); padding-bottom: .8rem; margin-bottom: 1rem;
+  }
+  header .logo-wrap { display: flex; align-items: center; gap: .8rem; }
+  header .logo-wrap img { height: 48px; width: auto; object-fit: contain; }
+  header .title-wrap h1 { font-size: 1.6rem; margin: 0; line-height: 1.2; }
+  header .title-wrap .subtitle { color: #555; font-size: .95rem; margin-top: .2rem; }
+
+  .row { display: flex; gap: 0.8rem; margin: 0.6rem 0; align-items: center; flex-wrap: wrap; }
+  input[type=text], input[type=password] { flex: 1; min-width: 240px; padding: 0.6rem; font-size: 1rem; }
   button { padding: 0.6rem 1rem; font-size: 1rem; cursor: pointer; }
   small { color: #555; }
   table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
-  th, td { border: 1px solid #ddd; padding: .6rem; text-align: left; vertical-align: top; }
+  th, td { border: 1px solid var(--border); padding: .6rem; text-align: left; vertical-align: top; }
   th { background: #f7f7f7; }
   .muted { color: #666; }
   .error { color: #b00020; margin-top: .4rem; }
   .spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid #999; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
   .rates { margin-top: .6rem; font-size: .95rem; color: #333; }
   .rates code { background: #f4f4f4; padding: .1rem .3rem; border-radius: .2rem; }
-  #map { height: 420px; margin-top: 1rem; border: 1px solid #ddd; }
+  #map { height: 420px; margin-top: 1rem; border: 1px solid var(--border); }
   .legend { background: white; padding: .6rem; border: 1px solid #ccc; border-radius: .4rem; font-size: .9rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-<h1>AZORG-WOONWERK<br/>Woon-werkverkeer calculator voor 6 campussen</h1>
 
-<!-- Verborgen API key veld: vul je eigen ORS sleutel in en laat verborgen -->
-<input id="apiKey" type="password" value="eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0=" style="display:none;"/>
+<header class="app-header">
+  <div class="logo-wrap">
+    <!-- Gebruik .png of .svg die je hebt geüpload -->
+    azorg-logo.png
+  </div>
+  <div class="title-wrap">
+    <h1>AZORG-WOONWERK</h1>
+    <div class="subtitle">Woon-werkverkeer calculator voor 6 campussen</div>
+  </div>
+</header>
+
+<div class="row">
+  <label for="apiKey" style="min-width: 180px;">OpenRouteService API-key:</label>
+  <!-- ✅ API-key vooraf ingevuld en zichtbaar voor gemak -->
+  <input id="apiKey" type="password" value="eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0=" placeholder="Plak hier je ORS API sleutel"/>
+</div>
 
 <div class="row">
   <label for="userAddress" style="min-width: 180px;">Je vertrekadres:</label>
@@ -64,7 +93,7 @@
   <tbody></tbody>
 </table>
 
-<!-- Kaart -->
+<!-- Opties voor kaartlagen -->
 <div class="row" style="gap:1.2rem;">
   <label><input type="checkbox" id="toggleCar" checked> Toon auto-routes</label>
   <label><input type="checkbox" id="toggleBike" checked> Toon fiets-routes</label>
@@ -72,7 +101,7 @@
 <div id="map"></div>
 
 <!-- Leaflet JS -->
-<script src="https://cdn.jsdelivr.net/npm/leaflet@aflet.js</script>
+<script src="https://cdn.jsdelivr.net/npm//dist/leaflet.js</script>
 
 <script>
 /** ============ Campussen (hard-coded coördinaten) ============ */
@@ -163,8 +192,8 @@ document.getElementById('toggleBike').addEventListener('change', e => { e.target
 const legend = L.control({position:'bottomleft'});
 legend.onAdd = () => {
   const div = L.DomUtil.create('div', 'legend');
-  div.innerHTML = `<div><span style="display:inline-block;width:18px;height:4px;background:#0078D7;margin-right:6px;"></span> Auto-route</div>
-                   <div><span style="display:inline-block;width:18px;height:4px;background:#2E7D32;margin-right:6px;border-bottom:2px dashed #2E7D32;"></span> Fiets-route</div>`;
+  div.innerHTML = `<div><span style="display:inline-block;width:18px;height:4px;background:${getComputedStyle(document.documentElement).getPropertyValue('--azorg-blue').trim()};margin-right:6px;"></span> Auto-route</div>
+                   <div><span style="display:inline-block;width:18px;height:4px;background:${getComputedStyle(document.documentElement).getPropertyValue('--azorg-green').trim()};margin-right:6px;border-bottom:2px dashed ${getComputedStyle(document.documentElement).getPropertyValue('--azorg-green').trim()};"></span> Fiets-route</div>`;
   return div;
 }; legend.addTo(map);
 
@@ -179,7 +208,7 @@ document.getElementById('calcBtn').addEventListener('click', async () => {
 
   const apiKey = document.getElementById('apiKey').value.trim();
   const userAddr = document.getElementById('userAddress').value.trim();
-  if (!apiKey) { errorEl.textContent = "Er is geen ORS API key ingesteld."; return; }
+  if (!apiKey) { errorEl.textContent = "Vul eerst je ORS API key in."; return; }
   if (!userAddr) { errorEl.textContent = "Vul eerst je vertrekadres in."; return; }
 
   try {
@@ -205,8 +234,8 @@ document.getElementById('calcBtn').addEventListener('click', async () => {
       await sleep(250);
       const bike = await routeORS("cycling-regular", origin, ref, apiKey);
 
-      if (car.pathLatLngs.length)  L.polyline(car.pathLatLngs,  { color:"#0078D7", weight:4, opacity:0.9 }).addTo(carLayer);
-      if (bike.pathLatLngs.length) L.polyline(bike.pathLatLngs, { color:"#2E7D32", weight:4, opacity:0.8, dashArray:"6,4" }).addTo(bikeLayer);
+      if (car.pathLatLngs.length)  L.polyline(car.pathLatLngs,  { color:getComputedStyle(document.documentElement).getPropertyValue('--azorg-blue').trim(),  weight:4, opacity:0.9 }).addTo(carLayer);
+      if (bike.pathLatLngs.length) L.polyline(bike.pathLatLngs, { color:getComputedStyle(document.documentElement).getPropertyValue('--azorg-green').trim(), weight:4, opacity:0.8, dashArray:"6,4" }).addTo(bikeLayer);
 
       const carAllowance  = calcCarAllowance(car.distanceMeters);
       const bikeAllowance = calcBikeAllowance(bike.distanceMeters);
