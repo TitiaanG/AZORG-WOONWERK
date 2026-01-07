@@ -8,12 +8,19 @@
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
     h1, h2 { margin: 0 0 12px; }
-    .row { display: flex; flex-wrap: wrap; gap: 16px; }
-    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
     label { display: block; font-weight: 600; margin-bottom: 6px; }
-    input[type="text"] { width: 100%; padding: 10px; border: 1px solid #bbb; border-radius: 6px; }
-    button { padding: 10px 16px; border: none; border-radius: 6px; background: #0058b0; color: #fff; cursor: pointer; }
-    button:disabled { background: #9bb8db; cursor: not-allowed; }
+    input[type="text"], input[type="password"] {
+      width: 100%; padding: 10px; border: 1px solid #bbb; border-radius: 6px;
+    }
+    .field { margin-bottom: 12px; }
+    .key-row { display: flex; gap: 8px; align-items: center; }
+    .key-row button { padding: 10px 12px; border: none; border-radius: 6px; background: #0058b0; color: #fff; cursor: pointer; }
+    .key-row button:disabled { background: #9bb8db; cursor: not-allowed; }
+
+    button.primary { padding: 10px 16px; border: none; border-radius: 6px; background: #0058b0; color: #fff; cursor: pointer; }
+    button.primary:disabled { background: #9bb8db; cursor: not-allowed; }
+
     table { width: 100%; border-collapse: collapse; margin-top: 16px; }
     th, td { border: 1px solid #e6e6e6; padding: 10px; text-align: left; vertical-align: top; }
     th { background: #f7f8fa; }
@@ -30,20 +37,23 @@
   </header>
 
   <section class="card">
-    <div class="row">
-      <div style="flex: 1 1 320px;">
-        <label for="apiKey">OpenRouteService API‑key</label>
-        <input id="apiKey" type="text"
-               value="eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0=" />
-      </div>
-      <div style="flex: 1 1 480px;">
-        <label for="origin">Je vertrekadres</label>
-        <input id="origin" type="text" placeholder="bv. Stationsstraat 1, 9300 Aalst" />
+    <!-- VERTICALE LAYOUT: velden onder elkaar -->
+    <div class="field">
+      <label for="apiKey">OpenRouteService API‑key</label>
+      <div class="key-row">
+        <!-- type="password" zorgt voor sterretjes/bolletjes -->
+        <input id="apiKey" type="password" autocomplete="off" />
+        <button id="toggleKey" type="button" aria-label="Toon/verberg API-key">Toon</button>
       </div>
     </div>
-    <div class="row" style="margin-top: 12px;">
-      <button id="btnGeocodeOrigin">Geocodeer vertrekadres</button>
-      <button id="btnCalculate" disabled>Bereken</button>
+    <div class="field">
+      <label for="origin">Je vertrekadres</label>
+      <input id="origin" type="text" placeholder="bv. Stationsstraat 1, 9300 Aalst" />
+    </div>
+
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;">
+      <button id="btnGeocodeOrigin" class="primary">Geocodeer vertrekadres</button>
+      <button id="btnCalculate" class="primary" disabled>Bereken</button>
     </div>
     <p class="note">
       💡 Vul eerst je vertrekadres in. Klik vervolgens op <strong>Geocodeer vertrekadres</strong>. Als de geocodering lukt, kun je op <strong>Bereken</strong> klikken.
@@ -79,6 +89,7 @@
 
   <script>
     // === Config ===
+    // Key is standaard gezet maar wordt GEMASKEERD weergegeven (type="password").
     const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0=";
     const AUTO_TARIEF = 0.4449; // €/km (enkel heen, vanaf 4 km)
     const FIETS_TARIEF = 0.3600; // €/km (heen + terug)
@@ -96,14 +107,22 @@
 
     // === Helpers ===
     const elApiKey = document.getElementById('apiKey');
+    const elToggleKey = document.getElementById('toggleKey');
     const elOrigin = document.getElementById('origin');
     const elBtnGeo = document.getElementById('btnGeocodeOrigin');
     const elBtnCalc = document.getElementById('btnCalculate');
     const elTBody = document.querySelector('#results tbody');
     const elErrors = document.getElementById('errors');
 
-    // Zet de key ook programmatisch (voor het geval input wordt overschreven)
+    // Prefill API key (blijft gemaskeerd omdat input type="password" is)
     elApiKey.value = ORS_API_KEY;
+
+    // Toon/verberg key (voor controle zonder tekens te tonen standaard)
+    elToggleKey.addEventListener('click', () => {
+      const isPassword = elApiKey.type === 'password';
+      elApiKey.type = isPassword ? 'text' : 'password';
+      elToggleKey.textContent = isPassword ? 'Verberg' : 'Toon';
+    });
 
     // Tabel initieel vullen met adressen (geen labels)
     function renderInitialTable() {
