@@ -2,198 +2,291 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>AZORG-WOONWERK — Woon-werkverkeer calculator</title>
-<style>
-  body { font-family: system-ui, Arial, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
-  h1 { font-size: 1.6rem; margin-bottom: .2rem; }
-  .subtitle { color: #555; margin-bottom: 1rem; }
-  .row { display: flex; gap: 0.8rem; margin: 0.6rem 0; align-items: center; flex-wrap: wrap; }
-  label { min-width: 180px; }
-  input[type=text], input[type=password] { flex: 1; min-width: 280px; padding: 0.6rem; font-size: 1rem; }
-  button { padding: 0.6rem 1rem; font-size: 1rem; cursor: pointer; }
-  table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
-  th, td { border: 1px solid #ddd; padding: .6rem; text-align: left; vertical-align: top; }
-  th { background: #f7f7f7; }
-  .muted { color: #666; }
-  .error { color: #b00020; margin-top: .4rem; white-space: pre-line; }
-  .spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid #999; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
-  .rates { margin-top: .6rem; font-size: .95rem; color: #333; }
-  .rates code { background: #f4f4f4; padding: .1rem .3rem; border-radius: .2rem; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AZORG — Woon‑werkverkeer calculator (6 campussen, adressen)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+    h1, h2 { margin: 0 0 12px; }
+    .row { display: flex; flex-wrap: wrap; gap: 16px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; }
+    input[type="text"] { width: 100%; padding: 10px; border: 1px solid #bbb; border-radius: 6px; }
+    button { padding: 10px 16px; border: none; border-radius: 6px; background: #0058b0; color: #fff; cursor: pointer; }
+    button:disabled { background: #9bb8db; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #e6e6e6; padding: 10px; text-align: left; vertical-align: top; }
+    th { background: #f7f8fa; }
+    .muted { color: #666; font-size: 0.95em; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .note { background: #fff8e1; border: 1px solid #ffe082; padding: 10px; border-radius: 6px; margin-top: 8px; }
+    .error { background: #fdecea; border: 1px solid #f5c6cb; color: #7f1d1d; padding: 10px; border-radius: 6px; }
+  </style>
 </head>
 <body>
-<h1>AZORG-WOONWERK</h1>
-<div class="subtitle">Woon-werkverkeer calculator voor 6 campussen</div>
+  <header>
+    <h1>AZORG — Woon‑werkverkeer calculator</h1>
+    <p class="muted">Bereken afstand, tijd en vergoeding (auto & fiets) vanuit jouw vertrekadres naar 6 campussen.</p>
+  </header>
 
-<div class="row">
-  <label for="apiKey">OpenRouteService API-key:</label>
-  <!-- ✅ API-key vooraf ingevuld -->
-  <input id="apiKey" type="password"
-         value="eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0="
-         placeholder="Plak hier je ORS API sleutel"/>
-</div>
+  <section class="card">
+    <div class="row">
+      <div style="flex: 1 1 320px;">
+        <label for="apiKey">OpenRouteService API‑key</label>
+        <input id="apiKey" type="text" placeholder="Voer je ORS API‑key in" />
+      </div>
+      <div style="flex: 1 1 480px;">
+        <label for="origin">Je vertrekadres</label>
+        <input id="origin" type="text" placeholder="bv. Stationsstraat 1, 9300 Aalst" />
+      </div>
+    </div>
+    <div class="row" style="margin-top: 12px;">
+      <button id="btnGeocodeOrigin">Geocodeer vertrekadres</button>
+      <button id="btnCalculate" disabled>Bereken</button>
+    </div>
+    <p class="note">
+      💡 Vul eerst je API‑key en vertrekadres in. Klik vervolgens op <strong>Geocodeer vertrekadres</strong>. Als de geocodering lukt, kun je op <strong>Bereken</strong> klikken om routes te berekenen.
+    </p>
+  </section>
 
-<div class="row">
-  <label for="userAddress">Je vertrekadres:</label>
-  <input id="userAddress" type="text" placeholder="Straat Huisnummer, Stad, Land (bv. Korenmarkt 1, Aalst, België)"/>
-  <button id="calcBtn">Bereken</button>
-</div>
+  <section class="card">
+    <h2>Tarieven woon‑werkvergoeding</h2>
+    <ul>
+      <li>Auto (vanaf 4 km, enkel heen): <span class="mono">€ 0,4449/km</span></li>
+      <li>Fiets (alle km, heen + terug): <span class="mono">€ 0,3600/km</span></li>
+    </ul>
+  </section>
 
-<div class="rates">
-  <strong>Tarieven woon‑werkvergoeding:</strong>
-  <ul>
-    <li>Wagen (vanaf <em>4 km</em>, enkel heen): <code>€ 0,4449/km</code></li>
-    <li>Fiets (alle km, <strong>heen + terug</strong>): <code>€ 0,3600/km</code></li>
-  </ul>
-</div>
+  <section class="card">
+    <table id="results">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Adres (Campus)</th>
+          <th>Auto — afstand / tijd</th>
+          <th>Fiets — afstand / tijd</th>
+          <th>Vergoeding auto</th>
+          <th>Vergoeding fiets (heen + terug)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- rijen worden dynamisch ingevuld -->
+      </tbody>
+    </table>
+    <div id="errors"></div>
+  </section>
 
-<div id="status" class="muted"></div>
-<div id="error" class="error"></div>
+  <script>
+    // === Config ===
+    const ORS_API_KEY = ''; // <-- Plaats hier je echte ORS API-key of vul via inputveld bovenaan.
+    const AUTO_TARIEF = 0.4449; // €/km (enkel heen, vanaf 4 km)
+    const FIETS_TARIEF = 0.3600; // €/km (heen + terug)
+    const MIN_AUTO_KM = 4.0;
 
-<table id="results" style="display:none;">
-  <thead>
-    <tr>
-      <th>#</th>
-      <th>Campus</th>
-      <th>Auto — afstand / tijd</th>
-      <th>Fiets — afstand / tijd</th>
-      <th>Vergoeding auto</th>
-      <th>Vergoeding fiets <span class="muted">(heen + terug)</span></th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+    // === Vul hier de 6 echte adressen in ===
+    // Toonbare adressen in de tabel én te geocoderen voor routes.
+    const campussen = [
+      { adres: 'Merestraat 80, 9300 Aalst' },
+      { adres: 'Moorselbaan 164, 9300 Aalst' },
+      { adres: 'Voorbeeldstraat 1, 9000 Gent' },
+      { adres: 'Voorbeeldlaan 10, 9500 Geraardsbergen' },
+      { adres: 'Ziekenhuisweg 2, 9400 Ninove' },
+      { adres: 'Campusplein 5, 9620 Zottegem' }
+    ];
+    // ❗️Tip: vervang alle bovenstaande adressen door de echte campusadressen.
 
-<script>
-/** ============ Campussen (label + adres) ============ */
-const REF_CAMPUSES = [
-  { label: "Moorselbaan: Campus Moorselbaan",    addr: "Moorselbaan 184, 9300 Aalst" },
-  { label: "Merestraat: Campus Merestraat",      addr: "Merestraat 80, 9300 Aalst" },
-  { label: "Wetteren: Campus Wetteren",          addr: "Wegvoeringstraat 73, 9230 Wetteren" },
-  { label: "Ninove: Campus Ninove",              addr: "Biezenstraat 2, 9400 Ninove" },
-  { label: "Asse: Campus Asse",                  addr: "Bloklaan 5, 1730 Asse" },
-  { label: "Geraardsbergen: Campus Geraardsbergen", addr: "Gasthuisstraat 4, 9500 Geraardsbergen" },
-];
+    // === Helpers ===
+    const elApiKey = document.getElementById('apiKey');
+    const elOrigin = document.getElementById('origin');
+    const elBtnGeo = document.getElementById('btnGeocodeOrigin');
+    const elBtnCalc = document.getElementById('btnCalculate');
+    const elTBody = document.querySelector('#results tbody');
+    const elErrors = document.getElementById('errors');
 
-/** ============ Vergoedingsparameters ============ */
-const CAR_RATE_EUR_PER_KM   = 0.4449;
-const BIKE_RATE_EUR_PER_KM  = 0.3600;
-const CAR_MIN_KM            = 4;
-const BIKE_ROUND_TRIP_MULT  = 2;
+    // Init: prefab key indien in constante gezet.
+    if (ORS_API_KEY) elApiKey.value = ORS_API_KEY;
 
-/** ============ Helpers ============ */
-const sleep = (ms) => new Promise(res => setTimeout(res, ms));
-function fmtKm(meters) { return (meters==null||!isFinite(meters)) ? "—" : (meters/1000).toFixed(2) + " km"; }
-function fmtDuration(seconds) {
-  if (seconds==null || !isFinite(seconds)) return "—";
-  const s = Math.round(seconds), h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
-  if (h>0) return `${h} u ${m} min`; if (m>0) return `${m} min`; return `${sec} s`;
-}
-const fmtCurrency = new Intl.NumberFormat('nl-BE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 });
-
-function calcCarAllowance(distanceMeters) {
-  const km = distanceMeters / 1000;
-  return km >= CAR_MIN_KM ? km * CAR_RATE_EUR_PER_KM : 0;
-}
-function calcBikeAllowance(distanceMeters) {
-  const km = distanceMeters / 1000;
-  return km * BIKE_RATE_EUR_PER_KM * BIKE_ROUND_TRIP_MULT; // heen + terug
-}
-
-/** ============ ORS API calls (GET met api_key) ============ */
-async function geocodeORS(address, apiKey) {
-  const url = new URL("https://api.openrouteservice.org/geocode/search");
-  url.searchParams.set("api_key", apiKey);
-  url.searchParams.set("text", address);
-  url.searchParams.set("size", "1");
-  url.searchParams.set("lang", "nl");
-  url.searchParams.set("boundary.country", "BE");
-  const resp = await fetch(url.toString());
-  if (!resp.ok) throw new Error(`Geocode fout (${resp.status})`);
-  const data = await resp.json();
-  if (!data.features || data.features.length===0) return null;
-  const f = data.features[0];
-  return { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
-}
-
-async function directionsORS(profile, start, end, apiKey) {
-  const url = new URL(`https://api.openrouteservice.org/v2/directions/${profile}`);
-  url.searchParams.set("api_key", apiKey);
-  url.searchParams.set("start", `${start.lon},${start.lat}`);
-  url.searchParams.set("end", `${end.lon},${end.lat}`);
-  url.searchParams.set("units", "km");
-  const resp = await fetch(url.toString());
-  if (!resp.ok) throw new Error(`Route fout (${profile}, ${resp.status})`);
-  const data = await resp.json();
-  const route = data.routes[0];
-  return { distanceMeters: route.summary.distance * 1000, durationSeconds: route.summary.duration };
-}
-
-/** ============ Berekening ============ */
-async function calculate() {
-  const apiKey = document.getElementById('apiKey').value.trim();
-  const userAddr = document.getElementById('userAddress').value.trim();
-  const statusEl = document.getElementById('status');
-  const errorEl = document.getElementById('error');
-  const tbody = document.querySelector('#results tbody');
-  errorEl.textContent = ""; statusEl.innerHTML = `<span class="spinner"></span> Adres geocoderen…`;
-  tbody.innerHTML = ""; document.getElementById('results').style.display = 'none';
-
-  if (!apiKey || !userAddr) { errorEl.textContent = "Vul API-key en adres in."; return; }
-
-  try {
-    const origin = await geocodeORS(userAddr, apiKey);
-    if (!origin) { errorEl.textContent = "Adres niet gevonden."; return; }
-
-    statusEl.innerHTML = `<span class="spinner"></span> Berekenen…`;
-    const results = [];
-    for (const campus of REF_CAMPUSES) {
-      await sleep(250);
-      const dest = await geocodeORS(campus.addr, apiKey);
-      if (!dest) {
-        results.push({ label: campus.label, car: null, bike: null, carAllowance: 0, bikeAllowance: 0 });
-        continue;
-      }
-      const car = await directionsORS("driving-car", origin, dest, apiKey);
-      await sleep(250);
-      const bike = await directionsORS("cycling-regular", origin, dest, apiKey);
-      results.push({
-        label: campus.label,
-        car, bike,
-        carAllowance: calcCarAllowance(car.distanceMeters),
-        bikeAllowance: calcBikeAllowance(bike.distanceMeters)
+    // Vul tabel initieel met adressen zichtbaar (geen labels)
+    function renderInitialTable() {
+      elTBody.innerHTML = '';
+      campussen.forEach((c, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>${escapeHtml(c.adres)}</td>
+          <td class="auto">—</td>
+          <td class="fiets">—</td>
+          <td class="autoVergoeding">—</td>
+          <td class="fietsVergoeding">—</td>
+        `;
+        elTBody.appendChild(tr);
       });
     }
+    renderInitialTable();
 
-    tbody.innerHTML = results.map(r => `
-      <tr>
-        <td></td>
-        <td>${r.label}</td>
-        <td>${r.car ? fmtKm(r.car.distanceMeters) + " / " + fmtDuration(r.car.durationSeconds) : "—"}</td>
-        <td>${r.bike ? fmtKm(r.bike.distanceMeters) + " / " + fmtDuration(r.bike.durationSeconds) : "—"}</td>
-        <td>${fmtCurrency.format(r.carAllowance)}</td>
-        <td>${fmtCurrency.format(r.bikeAllowance)}</td>
-      </tr>
-    `).join("");
-    document.getElementById('results').style.display = 'table';
-    statusEl.textContent = "";
-  } catch (e) {
-    statusEl.textContent = "";
-    errorEl.textContent = "Fout: " + e.message;
-  }
-}
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
 
-/** ✅ Klik + Enter functionaliteit */
-document.getElementById('calcBtn').addEventListener('click', calculate);
-document.getElementById('userAddress').addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    calculate();
-  }
-});
-</script>
+    function showError(msg) {
+      const div = document.createElement('div');
+      div.className = 'error';
+      div.textContent = msg;
+      elErrors.appendChild(div);
+      setTimeout(() => div.remove(), 8000);
+    }
+
+    // === ORS Geocoding ===
+    async function geocode(text, apiKey) {
+      const url = 'https://api.openrouteservice.org/geocode/search';
+      const params = new URLSearchParams({ text, size: '1', lang: 'nl' }).toString();
+      const res = await fetch(`${url}?${params}`, {
+        headers: { 'Authorization': apiKey }
+      });
+      if (!res.ok) throw new Error(`Geocoding mislukt (${res.status})`);
+      const data = await res.json();
+      const feat = data.features?.[0];
+      if (!feat) throw new Error('Geen geocode‑resultaat gevonden');
+      const [lon, lat] = feat.geometry.coordinates;
+      return { lat, lon, label: feat.properties.label || text };
+    }
+
+    // === ORS Routing ===
+    async function route(origin, destination, profile, apiKey) {
+      const url = `https://api.openrouteservice.org/v2/directions/${profile}`;
+      const body = {
+        coordinates: [
+          [origin.lon, origin.lat],
+          [destination.lon, destination.lat]
+        ]
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error(`Route mislukt (${profile}, ${res.status})`);
+      const data = await res.json();
+      const seg = data.routes?.[0]?.summary;
+      if (!seg) throw new Error('Geen route‑samenvatting ontvangen');
+      // Afstand in meter, duur in seconden
+      return { meters: seg.distance, seconds: seg.duration };
+    }
+
+    function formatKm(meters) {
+      return (meters / 1000).toFixed(2);
+    }
+    function formatTime(seconds) {
+      const mins = Math.round(seconds / 60);
+      if (mins < 60) return `${mins} min`;
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${h} u ${m} min`;
+    }
+
+    function calcAutoVergoeding(km) {
+      if (km < MIN_AUTO_KM) return 0;
+      return km * AUTO_TARIEF; // enkel heen
+    }
+    function calcFietsVergoeding(km) {
+      return km * 2 * FIETS_TARIEF; // heen + terug
+    }
+    function euro(x) {
+      return `€ ${x.toFixed(2).replace('.', ',')}`;
+    }
+
+    // === Events ===
+    elBtnGeo.addEventListener('click', async () => {
+      elBtnGeo.disabled = true;
+      elBtnCalc.disabled = true;
+      try {
+        const apiKey = (elApiKey.value || '').trim();
+        const originText = (elOrigin.value || '').trim();
+        if (!apiKey) throw new Error('Vul je OpenRouteService API‑key in.');
+        if (!originText) throw new Error('Vul je vertrekadres in.');
+
+        window.__origin = await geocode(originText, apiKey);
+        elBtnCalc.disabled = false;
+      } catch (err) {
+        showError(err.message || String(err));
+      } finally {
+        elBtnGeo.disabled = false;
+      }
+    });
+
+    elBtnCalc.addEventListener('click', async () => {
+      elBtnCalc.disabled = true;
+      try {
+        const apiKey = (elApiKey.value || '').trim();
+        if (!apiKey) throw new Error('Vul je OpenRouteService API‑key in.');
+        const origin = window.__origin;
+        if (!origin) throw new Error('Geocodeer eerst je vertrekadres.');
+
+        // Geocode alle campussen (adressen worden gebruikt, geen labels)
+        const dests = [];
+        for (const c of campussen) {
+          try {
+            const geo = await geocode(c.adres, apiKey);
+            dests.push({ ...c, geo });
+          } catch (e) {
+            dests.push({ ...c, geo: null, error: e.message });
+          }
+        }
+
+        // Bereken routes en vul tabel
+        const rows = Array.from(elTBody.querySelectorAll('tr'));
+        for (let i = 0; i < dests.length; i++) {
+          const row = rows[i];
+          const dest = dests[i];
+
+          const tdAuto = row.querySelector('.auto');
+          const tdFiets = row.querySelector('.fiets');
+          const tdAutoVer = row.querySelector('.autoVergoeding');
+          const tdFietsVer = row.querySelector('.fietsVergoeding');
+
+          if (!dest.geo) {
+            tdAuto.textContent = '—';
+            tdFiets.textContent = '—';
+            tdAutoVer.textContent = '—';
+            tdFietsVer.textContent = '—';
+            showError(`Geocoding mislukt voor: ${dest.adres} (${dest.error})`);
+            continue;
+          }
+
+          // Auto
+          try {
+            const ra = await route(origin, dest.geo, 'driving-car', apiKey);
+            const kmA = parseFloat(formatKm(ra.meters));
+            tdAuto.textContent = `${kmA} km — ${formatTime(ra.seconds)}`;
+            tdAutoVer.textContent = euro(calcAutoVergoeding(kmA));
+          } catch (e) {
+            tdAuto.textContent = '—';
+            tdAutoVer.textContent = '—';
+            showError(`Route (auto) mislukt voor: ${dest.adres} (${e.message})`);
+          }
+
+          // Fiets
+          try {
+            const rf = await route(origin, dest.geo, 'cycling-regular', apiKey);
+            const kmF = parseFloat(formatKm(rf.meters));
+            tdFiets.textContent = `${kmF} km — ${formatTime(rf.seconds)}`;
+            tdFietsVer.textContent = euro(calcFietsVergoeding(kmF));
+          } catch (e) {
+            tdFiets.textContent = '—';
+            tdFietsVer.textContent = '—';
+            showError(`Route (fiets) mislukt voor: ${dest.adres} (${e.message})`);
+          }
+        }
+      } catch (err) {
+        showError(err.message || String(err));
+      } finally {
+        elBtnCalc.disabled = false;
+      }
+    });
+  </script>
 </body>
 </html>
+``
