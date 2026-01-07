@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AZORG — Woon‑werkverkeer calculator (6 campussen, adressen)</title>
+  <title>AZORG — Woon‑werkverkeer calculator (adressen)</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
     h1, h2 { margin: 0 0 12px; }
@@ -33,7 +33,8 @@
     <div class="row">
       <div style="flex: 1 1 320px;">
         <label for="apiKey">OpenRouteService API‑key</label>
-        <input id="apiKey" type="text" value="eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0=" />
+        <input id="apiKey" type="text"
+               value="eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0=" />
       </div>
       <div style="flex: 1 1 480px;">
         <label for="origin">Je vertrekadres</label>
@@ -45,7 +46,7 @@
       <button id="btnCalculate" disabled>Bereken</button>
     </div>
     <p class="note">
-      💡 Vul eerst je vertrekadres in. Klik vervolgens op <strong>Geocodeer vertrekadres</strong>. Als de geocodering lukt, kun je op <strong>Bereken</strong> klikken om routes te berekenen.
+      💡 Vul eerst je vertrekadres in. Klik vervolgens op <strong>Geocodeer vertrekadres</strong>. Als de geocodering lukt, kun je op <strong>Bereken</strong> klikken.
     </p>
   </section>
 
@@ -77,20 +78,23 @@
   </section>
 
   <script>
+    // === Config ===
     const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0=";
-    const AUTO_TARIEF = 0.4449;
-    const FIETS_TARIEF = 0.3600;
+    const AUTO_TARIEF = 0.4449; // €/km (enkel heen, vanaf 4 km)
+    const FIETS_TARIEF = 0.3600; // €/km (heen + terug)
     const MIN_AUTO_KM = 4.0;
 
+    // === Correcte adressen (enkel adres wordt getoond) ===
     const campussen = [
-      { adres: 'Merestraat 80, 9300 Aalst' },
-      { adres: 'Moorselbaan 164, 9300 Aalst' },
-      { adres: 'Voorbeeldstraat 1, 9000 Gent' },
-      { adres: 'Voorbeeldlaan 10, 9500 Geraardsbergen' },
-      { adres: 'Ziekenhuisweg 2, 9400 Ninove' },
-      { adres: 'Campusplein 5, 9620 Zottegem' }
+      { adres: 'Moorselbaan 164, 9300 Aalst' },           // Campus Moorselbaan
+      { adres: 'Merestraat 80, 9300 Aalst' },             // Campus Merestraat
+      { adres: 'Bloklaan 5, 1730 Asse' },                 // Campus Asse
+      { adres: 'Gasthuisstraat 4, 9500 Geraardsbergen' }, // Campus Geraardsbergen
+      { adres: 'Biezenstraat 2, 9400 Ninove' },           // Campus Ninove
+      { adres: 'Wegvoeringstraat 73, 9230 Wetteren' }     // Campus Wetteren
     ];
 
+    // === Helpers ===
     const elApiKey = document.getElementById('apiKey');
     const elOrigin = document.getElementById('origin');
     const elBtnGeo = document.getElementById('btnGeocodeOrigin');
@@ -98,8 +102,10 @@
     const elTBody = document.querySelector('#results tbody');
     const elErrors = document.getElementById('errors');
 
+    // Zet de key ook programmatisch (voor het geval input wordt overschreven)
     elApiKey.value = ORS_API_KEY;
 
+    // Tabel initieel vullen met adressen (geen labels)
     function renderInitialTable() {
       elTBody.innerHTML = '';
       campussen.forEach((c, idx) => {
@@ -129,6 +135,7 @@
       setTimeout(() => div.remove(), 8000);
     }
 
+    // === ORS Geocoding ===
     async function geocode(text, apiKey) {
       const url = 'https://api.openrouteservice.org/geocode/search';
       const params = new URLSearchParams({ text, size: '1', lang: 'nl' }).toString();
@@ -143,6 +150,7 @@
       return { lat, lon, label: feat.properties.label || text };
     }
 
+    // === ORS Routing ===
     async function route(origin, destination, profile, apiKey) {
       const url = `https://api.openrouteservice.org/v2/directions/${profile}`;
       const body = {
@@ -178,6 +186,7 @@
     function calcFietsVergoeding(km) { return km * 2 * FIETS_TARIEF; }
     function euro(x) { return `€ ${x.toFixed(2).replace('.', ',')}`; }
 
+    // === Events ===
     elBtnGeo.addEventListener('click', async () => {
       elBtnGeo.disabled = true;
       elBtnCalc.disabled = true;
@@ -202,6 +211,8 @@
         if (!apiKey) throw new Error('Vul je OpenRouteService API‑key in.');
         const origin = window.__origin;
         if (!origin) throw new Error('Geocodeer eerst je vertrekadres.');
+
+        // Geocode alle campussen op basis van adres
         const dests = [];
         for (const c of campussen) {
           try {
@@ -211,14 +222,18 @@
             dests.push({ ...c, geo: null, error: e.message });
           }
         }
+
+        // Bereken routes en vul tabel
         const rows = Array.from(elTBody.querySelectorAll('tr'));
         for (let i = 0; i < dests.length; i++) {
           const row = rows[i];
           const dest = dests[i];
+
           const tdAuto = row.querySelector('.auto');
           const tdFiets = row.querySelector('.fiets');
           const tdAutoVer = row.querySelector('.autoVergoeding');
           const tdFietsVer = row.querySelector('.fietsVergoeding');
+
           if (!dest.geo) {
             tdAuto.textContent = '—';
             tdFiets.textContent = '—';
@@ -227,6 +242,8 @@
             showError(`Geocoding mislukt voor: ${dest.adres} (${dest.error})`);
             continue;
           }
+
+          // Auto
           try {
             const ra = await route(origin, dest.geo, 'driving-car', apiKey);
             const kmA = parseFloat(formatKm(ra.meters));
@@ -237,6 +254,8 @@
             tdAutoVer.textContent = '—';
             showError(`Route (auto) mislukt voor: ${dest.adres} (${e.message})`);
           }
+
+          // Fiets
           try {
             const rf = await route(origin, dest.geo, 'cycling-regular', apiKey);
             const kmF = parseFloat(formatKm(rf.meters));
