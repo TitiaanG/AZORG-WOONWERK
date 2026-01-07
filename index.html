@@ -5,11 +5,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>AZORG-WOONWERK — Woon-werkverkeer calculator (6 campussen)</title>
-<style>
-  body { font-family: system-ui, Arial, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+
+<!-- Leaflet voor kaart (jsDelivr CDN) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/ system-ui, Arial, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
   h1 { font-size: 1.4rem; }
   .row { display: flex; gap: 0.8rem; margin: 0.6rem 0; align-items: center; }
-  input[type=text], input[type=password] { flex: 1; padding: 0.6rem; font-size: 1rem; }
+  input[type=text] { flex: 1; padding: 0.6rem; font-size: 1rem; }
   button { padding: 0.6rem 1rem; font-size: 1rem; cursor: pointer; }
   small { color: #555; }
   table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
@@ -20,27 +21,23 @@
   .spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid #999; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
   .rates { margin-top: .6rem; font-size: .95rem; color: #333; }
   .rates code { background: #f4f4f4; padding: .1rem .3rem; border-radius: .2rem; }
+  #map { height: 420px; margin-top: 1rem; border: 1px solid #ddd; }
+  .legend { background: white; padding: .6rem; border: 1px solid #ccc; border-radius: .4rem; font-size: .9rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 <h1>AZORG-WOONWERK<br/>Woon-werkverkeer calculator voor 6 campussen</h1>
 
-<div class="row">
-  <label for="apiKey" style="min-width: 180px;">OpenRouteService API-key:</label>
-  <!-- Laat leeg; gebruikers plakken hun eigen sleutel -->
-  <input id="apiKey" type="password" value="eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0="/>
-</div>
+<!-- Verborgen API key veld: vul je eigen ORS sleutel in en laat verborgen -->
+<input id="apiKey" type="password" value="eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0=" style="display:none;"/>
 
 <div class="row">
   <label for="userAddress" style="min-width: 180px;">Je vertrekadres:</label>
   <input id="userAddress" type="text" placeholder="Straat Huisnummer, Stad, Land (bv. Korenmarkt 1, Aalst, België)"/>
-</div>
-
-<div class="row">
   <button id="calcBtn">Bereken</button>
-  <small class="muted">Profielen: auto = <code>driving-car</code>, fiets = <code>cycling-regular</code></small>
 </div>
+<small class="muted">Profielen: auto = <code>driving-car</code>, fiets = <code>cycling-regular</code></small>
 
 <div class="rates">
   <strong>Tarieven woon‑werkvergoeding:</strong>
@@ -67,6 +64,16 @@
   <tbody></tbody>
 </table>
 
+<!-- Kaart -->
+<div class="row" style="gap:1.2rem;">
+  <label><input type="checkbox" id="toggleCar" checked> Toon auto-routes</label>
+  <label><input type="checkbox" id="toggleBike" checked> Toon fiets-routes</label>
+</div>
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://cdn.jsdelivr.net/npm/leaflet@aflet.js</script>
+
 <script>
 /** ============ Campussen (hard-coded coördinaten) ============ */
 const REF_POINTS = [
@@ -79,9 +86,9 @@ const REF_POINTS = [
 ];
 
 /** ============ Vergoedingsparameters ============ */
-const CAR_RATE_EUR_PER_KM   = 0.4449; // vanaf 1/07/2025
-const BIKE_RATE_EUR_PER_KM  = 0.3600; // vanaf 1/01/2025
-const CAR_MIN_KM            = 4;      // auto: enkel vergoeding vanaf 4 km
+const CAR_RATE_EUR_PER_KM   = 0.4449; // auto: € 0,4449/km (vanaf 1/07/2025)
+const BIKE_RATE_EUR_PER_KM  = 0.3600; // fiets: € 0,3600/km (vanaf 1/01/2025)
+const CAR_MIN_KM            = 4;      // auto: enkel vanaf 4 km (heen)
 const BIKE_ROUND_TRIP_MULT  = 2;      // fiets: heen + terug
 
 /** ============ Helpers ============ */
@@ -94,7 +101,6 @@ function fmtDuration(seconds) {
 }
 const fmtCurrency = new Intl.NumberFormat('nl-BE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
-/** ============ Vergoedingslogica ============ */
 function calcCarAllowance(distanceMeters) {
   if (distanceMeters==null || !isFinite(distanceMeters)) return 0;
   const km = distanceMeters / 1000;
@@ -121,9 +127,18 @@ async function geocodeORS(address, apiKey) {
   const f = data.features[0];
   return { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], label: f.properties.label || address };
 }
+
+// Met geometry voor het tekenen op de kaart
 async function routeORS(profile, start, end, apiKey) {
   const url = `https://api.openrouteservice.org/v2/directions/${profile}`;
-  const body = { coordinates: [[start.lon, start.lat],[end.lon, end.lat]], units: "km", language: "nl" };
+  const body = {
+    coordinates: [[start.lon, start.lat],[end.lon, end.lat]],
+    units: "km",
+    language: "nl",
+    geometry: true,
+    geometry_format: "geojson",
+    geometry_simplify: true
+  };
   const resp = await fetch(url, { method: "POST", headers: {
     "Authorization": apiKey, "Content-Type": "application/json", "Accept": "application/json"
   }, body: JSON.stringify(body) });
@@ -131,40 +146,70 @@ async function routeORS(profile, start, end, apiKey) {
   const data = await resp.json();
   const route = data?.routes?.[0];
   if (!route?.summary) throw new Error("Geen route samenvatting ontvangen.");
-  return { distanceMeters: route.summary.distance*1000, durationSeconds: route.summary.duration };
+  const coords = (route.geometry?.coordinates || []).map(([lon,lat]) => [lat,lon]);
+  return { distanceMeters: route.summary.distance*1000, durationSeconds: route.summary.duration, pathLatLngs: coords };
 }
+
+/** ============ Leaflet kaart ============ */
+const map = L.map('map');
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap-bijdragers' }).addTo(map);
+const carLayer = L.layerGroup().addTo(map);
+const bikeLayer = L.layerGroup().addTo(map);
+const markersLayer = L.layerGroup().addTo(map);
+document.getElementById('toggleCar').addEventListener('change', e => { e.target.checked ? carLayer.addTo(map) : map.removeLayer(carLayer); });
+document.getElementById('toggleBike').addEventListener('change', e => { e.target.checked ? bikeLayer.addTo(map) : map.removeLayer(bikeLayer); });
+
+// Legenda
+const legend = L.control({position:'bottomleft'});
+legend.onAdd = () => {
+  const div = L.DomUtil.create('div', 'legend');
+  div.innerHTML = `<div><span style="display:inline-block;width:18px;height:4px;background:#0078D7;margin-right:6px;"></span> Auto-route</div>
+                   <div><span style="display:inline-block;width:18px;height:4px;background:#2E7D32;margin-right:6px;border-bottom:2px dashed #2E7D32;"></span> Fiets-route</div>`;
+  return div;
+}; legend.addTo(map);
 
 /** ============ Hoofdlogica ============ */
 document.getElementById('calcBtn').addEventListener('click', async () => {
-  document.getElementById('error').textContent = ""; 
-  document.getElementById('status').innerHTML = `<span class="spinner"></span> Adres geocoderen…`;
+  const statusEl = document.getElementById('status');
+  const errorEl = document.getElementById('error');
+  errorEl.textContent = ""; 
+  statusEl.innerHTML = `<span class="spinner"></span> Adres geocoderen…`;
   document.getElementById('results').style.display = 'none';
   const tbody = document.querySelector('#results tbody'); tbody.innerHTML = "";
 
   const apiKey = document.getElementById('apiKey').value.trim();
   const userAddr = document.getElementById('userAddress').value.trim();
-  if (!apiKey) { document.getElementById('error').textContent = "Vul eerst je ORS API key in."; return; }
-  if (!userAddr) { document.getElementById('error').textContent = "Vul eerst je vertrekadres in."; return; }
+  if (!apiKey) { errorEl.textContent = "Er is geen ORS API key ingesteld."; return; }
+  if (!userAddr) { errorEl.textContent = "Vul eerst je vertrekadres in."; return; }
 
   try {
-    // Geocode herkomst (1 call)
+    // Geocode herkomst
     const origin = await geocodeORS(userAddr, apiKey);
-    if (!origin) { document.getElementById('error').textContent = "Je adres kon niet worden gevonden. Voeg stad/land toe en controleer spelling."; return; }
+    if (!origin) { errorEl.textContent = "Je adres kon niet worden gevonden. Voeg stad/land toe en controleer spelling."; return; }
 
-    // Routes berekenen
-    document.getElementById('status').innerHTML = `<span class="spinner"></span> Routes berekenen…`;
+    // wis vorige kaartlagen
+    carLayer.clearLayers(); bikeLayer.clearLayers(); markersLayer.clearLayers();
+    const boundsPts = [[origin.lat, origin.lon]];
+    markersLayer.addLayer(L.marker([origin.lat, origin.lon]).bindPopup("Start: " + (origin.label || userAddr)));
+
+    // Routes berekenen + tekenen
+    statusEl.innerHTML = `<span class="spinner"></span> Routes berekenen en tekenen…`;
     const results = [];
     for (let i=0; i<REF_POINTS.length; i++) {
       const ref = REF_POINTS[i];
+      boundsPts.push([ref.lat, ref.lon]);
+      markersLayer.addLayer(L.marker([ref.lat, ref.lon]).bindPopup(`[${i+1}] ${ref.addr}`));
+
       await sleep(250);
       const car  = await routeORS("driving-car", origin, ref, apiKey);
       await sleep(250);
       const bike = await routeORS("cycling-regular", origin, ref, apiKey);
 
-      // Vergoedingen berekenen
+      if (car.pathLatLngs.length)  L.polyline(car.pathLatLngs,  { color:"#0078D7", weight:4, opacity:0.9 }).addTo(carLayer);
+      if (bike.pathLatLngs.length) L.polyline(bike.pathLatLngs, { color:"#2E7D32", weight:4, opacity:0.8, dashArray:"6,4" }).addTo(bikeLayer);
+
       const carAllowance  = calcCarAllowance(car.distanceMeters);
       const bikeAllowance = calcBikeAllowance(bike.distanceMeters);
-
       results.push({ idx:i+1, addr: ref.addr, car, bike, carAllowance, bikeAllowance });
     }
 
@@ -186,10 +231,14 @@ document.getElementById('calcBtn').addEventListener('click', async () => {
     }
 
     document.getElementById('results').style.display = 'table';
-    document.getElementById('status').textContent = "";
+    statusEl.textContent = "";
+
+    // Kaart naar alle punten zoomen
+    const bounds = L.latLngBounds(boundsPts);
+    if (bounds.isValid()) map.fitBounds(bounds.pad(0.08));
   } catch(e) {
-    document.getElementById('status').textContent = "";
-    document.getElementById('error').textContent = "Er ging iets mis: " + e.message;
+    statusEl.textContent = "";
+    errorEl.textContent = "Er ging iets mis: " + e.message;
     console.error(e);
   }
 });
