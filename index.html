@@ -17,7 +17,7 @@
   th, td { border: 1px solid #ddd; padding: .6rem; text-align: left; vertical-align: top; }
   th { background: #f7f7f7; }
   .muted { color: #666; }
-  .error { color: #b00020; margin-top: .4rem; }
+  .error { color: #b00020; margin-top: .4rem; white-space: pre-line; }
   .spinner { display: inline-block; width: 1em; height: 1em; border: 2px solid #999; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
   .rates { margin-top: .6rem; font-size: .95rem; color: #333; }
   .rates code { background: #f4f4f4; padding: .1rem .3rem; border-radius: .2rem; }
@@ -30,7 +30,7 @@
 
 <div class="row">
   <label for="apiKey">OpenRouteService API-key:</label>
-  <!-- ✅ API-key vooraf ingevuld; je hoeft niets te plakken -->
+  <!-- ✅ API-key vooraf ingevuld; we lezen hem uit dit veld -->
   <input id="apiKey" type="password"
          value="eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImY0YTA5MTgyZWRjODRiNTZhMzI5ZWY3ZDJiZTNhYTQ3IiwiaCI6Im11cm11cjY0In0="
          placeholder="Plak hier je ORS API sleutel"/>
@@ -46,7 +46,7 @@
   <strong>Tarieven woon‑werkvergoeding:</strong>
   <ul>
     <li>Wagen (vanaf <em>4 km</em>, enkel heen): <code>€ 0,4449/km</code></li>
-    <li>Fiets (alle km, heen + terug): <code>€ 0,3600/km</code></li>
+    <li>Fiets (alle km, <strong>heen + terug</strong>): <code>€ 0,3600/km</code></li>
   </ul>
 </div>
 
@@ -57,25 +57,25 @@
   <thead>
     <tr>
       <th>#</th>
-      <th>Campusadres</th>
+      <th>Campus</th>
       <th>Auto — afstand / tijd</th>
       <th>Fiets — afstand / tijd</th>
       <th>Vergoeding auto</th>
-      <th>Vergoeding fiets</th>
+      <th>Vergoeding fiets <span class="muted">(heen + terug)</span></th>
     </tr>
   </thead>
   <tbody></tbody>
 </table>
 
 <script>
-/** ============ Campussen (hard-coded adressen) ============ */
-const REF_ADDRESSES = [
-  "Merestraat 80, 9300 Aalst",
-  "Moorselbaan 184, 9300 Aalst",
-  "Bloklaan 5, 1730 Asse",
-  "Gasthuisstraat 4, 9500 Geraardsbergen",
-  "Biezenstraat 2, 9400 Ninove",
-  "Wegvoeringstraat 73, 9230 Wetteren",
+/** ============ Campussen (label + adres) ============ */
+const REF_CAMPUSES = [
+  { label: "Moorselbaan: Campus Moorselbaan",    addr: "Moorselbaan 184, 9300 Aalst" },
+  { label: "Merestraat: Campus Merestraat",      addr: "Merestraat 80, 9300 Aalst" },
+  { label: "Wetteren: Campus Wetteren",          addr: "Wegvoeringstraat 73, 9230 Wetteren" },
+  { label: "Ninove: Campus Ninove",              addr: "Biezenstraat 2, 9400 Ninove" },
+  { label: "Asse: Campus Asse",                  addr: "Bloklaan 5, 1730 Asse" },
+  { label: "Geraardsbergen: Campus Geraardsbergen", addr: "Gasthuisstraat 4, 9500 Geraardsbergen" },
 ];
 
 /** ============ Vergoedingsparameters ============ */
@@ -103,29 +103,34 @@ function calcCarAllowance(distanceMeters) {
 function calcBikeAllowance(distanceMeters) {
   if (distanceMeters==null || !isFinite(distanceMeters)) return 0;
   const km = distanceMeters / 1000;
-  return km * BIKE_RATE_EUR_PER_KM * BIKE_ROUND_TRIP_MULT; // heen + terug
+  // ✅ heen + terug
+  return km * BIKE_RATE_EUR_PER_KM * BIKE_ROUND_TRIP_MULT;
 }
 
-/** ============ ORS API calls ============ */
+/** ============ ORS (GET met api_key in query) ============ */
 async function geocodeORS(address, apiKey) {
   const url = new URL("https://api.openrouteservice.org/geocode/search");
+  url.searchParams.set("api_key", apiKey);
   url.searchParams.set("text", address);
   url.searchParams.set("size", "1");
   url.searchParams.set("lang", "nl");
   url.searchParams.set("boundary.country", "BE");
-  const resp = await fetch(url, { headers: { "Authorization": apiKey, "Accept": "application/json" }});
+  const resp = await fetch(url.toString(), { headers: { "Accept": "application/json" }});
   if (!resp.ok) throw new Error(`Geocode fout (${resp.status})`);
   const data = await resp.json();
   if (!data.features || data.features.length===0) return null;
   const f = data.features[0];
   return { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], label: f.properties.label || address };
 }
-async function routeORS(profile, start, end, apiKey) {
-  const url = `https://api.openrouteservice.org/v2/directions/${profile}`;
-  const body = { coordinates: [[start.lon, start.lat],[end.lon, end.lat]], units: "km", language: "nl" };
-  const resp = await fetch(url, { method: "POST", headers: {
-    "Authorization": apiKey, "Content-Type": "application/json", "Accept": "application/json"
-  }, body: JSON.stringify(body) });
+
+async function directionsORS_GET(profile, start, end, apiKey) {
+  const base = `https://api.openrouteservice.org/v2/directions/${profile}`;
+  const url = new URL(base);
+  url.searchParams.set("api_key", apiKey);
+  url.searchParams.set("start", `${start.lon},${start.lat}`);
+  url.searchParams.set("end",   `${end.lon},${end.lat}`);
+  url.searchParams.set("units", "km");
+  const resp = await fetch(url.toString(), { headers: { "Accept": "application/json" }});
   if (!resp.ok) throw new Error(`Route fout (${profile}, ${resp.status})`);
   const data = await resp.json();
   const route = data?.routes?.[0];
@@ -135,14 +140,12 @@ async function routeORS(profile, start, end, apiKey) {
 
 /** ============ Hoofdlogica ============ */
 document.getElementById('calcBtn').addEventListener('click', async () => {
-  // Reset UI
   const statusEl = document.getElementById('status');
   const errorEl = document.getElementById('error');
   const tbody = document.querySelector('#results tbody');
   errorEl.textContent = ""; statusEl.innerHTML = `<span class="spinner"></span> Adres geocoderen…`;
   document.getElementById('results').style.display = 'none'; tbody.innerHTML = "";
 
-  // Lees inputs
   const apiKey = document.getElementById('apiKey').value.trim();
   const userAddr = document.getElementById('userAddress').value.trim();
   if (!apiKey) { errorEl.textContent = "Vul eerst je ORS API key in."; return; }
@@ -153,30 +156,49 @@ document.getElementById('calcBtn').addEventListener('click', async () => {
     const origin = await geocodeORS(userAddr, apiKey);
     if (!origin) { errorEl.textContent = "Je adres kon niet worden gevonden. Voeg stad/land toe en controleer spelling."; return; }
 
-    // 2) Voor elke campus: route auto + fiets
-    statusEl.innerHTML = `<span class="spinner"></span> Routes berekenen…`;
-    const results = [];
-    for (let i=0; i<REF_ADDRESSES.length; i++) {
-      const destAddr = REF_ADDRESSES[i];
-      await sleep(200);
-      const car  = await routeORS("driving-car", origin, await geocodeORS(destAddr, apiKey), apiKey);
-      await sleep(200);
-      const bike = await routeORS("cycling-regular", origin, await geocodeORS(destAddr, apiKey), apiKey);
-
-      const carAllowance  = calcCarAllowance(car.distanceMeters);
-      const bikeAllowance = calcBikeAllowance(bike.distanceMeters);
-      results.push({ idx:i+1, addr: destAddr, car, bike, carAllowance, bikeAllowance });
+    // 2) Geocode alle campussen één keer
+    statusEl.innerHTML = `<span class="spinner"></span> Campussen geocoderen…`;
+    const dests = [];
+    for (const c of REF_CAMPUSES) {
+      await sleep(300);
+      const g = await geocodeORS(c.addr, apiKey);
+      dests.push(g ? { label:c.label, addr:c.addr, ok:true, lat:g.lat, lon:g.lon }
+                   : { label:c.label, addr:c.addr, ok:false });
     }
 
-    // 3) Sorteer op auto-afstand
+    // 3) Routes berekenen (GET) met kleine delay
+    statusEl.innerHTML = `<span class="spinner"></span> Routes berekenen…`;
+    const results = [];
+    for (let i=0; i<dests.length; i++) {
+      const d = dests[i];
+      if (!d.ok) {
+        results.push({ idx:i+1, label:d.label,
+          car:{distanceMeters:NaN,durationSeconds:NaN},
+          bike:{distanceMeters:NaN,durationSeconds:NaN},
+          carAllowance:0, bikeAllowance:0
+        });
+        continue;
+      }
+      const end = { lat:d.lat, lon:d.lon };
+      await sleep(300);
+      const car  = await directionsORS_GET("driving-car", origin, end, apiKey);
+      await sleep(300);
+      const bike = await directionsORS_GET("cycling-regular", origin, end, apiKey);
+
+      const carAllowance  = calcCarAllowance(car.distanceMeters);
+      const bikeAllowance = calcBikeAllowance(bike.distanceMeters); // ✅ heen+terug
+      results.push({ idx:i+1, label:d.label, car, bike, carAllowance, bikeAllowance });
+    }
+
+    // 4) Sorteer op auto-afstand
     results.sort((a,b) => (a.car.distanceMeters||Infinity) - (b.car.distanceMeters||Infinity));
 
-    // 4) Tabel vullen
+    // 5) Tabel vullen (gebruik campuslabel i.p.v. adres)
     for (const r of results) {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${r.idx}</td>
-        <td>${r.addr}</td>
+        <td>${r.label}</td>
         <td>${fmtKm(r.car.distanceMeters)} / ${fmtDuration(r.car.durationSeconds)}</td>
         <td>${fmtKm(r.bike.distanceMeters)} / ${fmtDuration(r.bike.durationSeconds)}</td>
         <td>${fmtCurrency.format(r.carAllowance)}</td>
@@ -188,7 +210,10 @@ document.getElementById('calcBtn').addEventListener('click', async () => {
     document.getElementById('results').style.display = 'table';
     statusEl.textContent = "";
   } catch(e) {
-    statusEl.textContent = ""; document.getElementById('error').textContent = "Er ging iets mis: " + e.message;
+    statusEl.textContent = "";
+    errorEl.textContent =
+      "Er ging iets mis: " + (e?.message || e) +
+      "\nTip: Geef een volledig adres (straat + nr + stad + land) en probeer desnoods incognito of met harde refresh.";
     console.error(e);
   }
 });
