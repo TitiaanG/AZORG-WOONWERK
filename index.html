@@ -54,11 +54,8 @@
 
   <section class="card">
     <h2>Tarieven woon‑werkvergoeding</h2>
-    <ul>
-      <li>Auto (vanaf 4 km, enkel heen): <span class="mono">€ 0,4449/km</span></li>
-      <li>Fiets (alle km, heen + terug): <span class="mono">€ 0,3600/km</span></li>
-    </ul>
-  </section>
+  <p class="muted">De dagvergoeding wordt bepaald op basis van de afstand (km, enkel traject) volgens de tabel "Sociaal abonnement" uit het meegeleverde Excel-bestand.</p>
+</section>
 
   <section class="card">
     <table id="results">
@@ -69,7 +66,8 @@
           <th>Auto — afstand / tijd</th>
           <th>Fiets — afstand / tijd</th>
           <th>Vergoeding auto</th>
-          <th>Vergoeding fiets (heen + terug)</th>
+          <th>Vergoeding fiets</th>
+      <th>Werkdagen</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -77,185 +75,245 @@
     <div id="errors"></div>
   </section>
 
-  <script>
-    const AUTO_TARIEF = 0.4449;
-    const FIETS_TARIEF = 0.3600;
-    const MIN_AUTO_KM = 4.0;
+  
+<script>
+// Tarieftabel (per dag) uit 'sociaal abonnement.xlsx'
+// Kolommen: [km_van, km_tot, bedrag_per_dag]
+const SOCIAAL_TARIEVEN = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0136363636363637], [2.0, 2.0, 1.0136363636363637], [3.0, 3.0, 1.0136363636363637], [4.0, 4.0, 1.1090909090909091], [5.0, 5.0, 1.1818181818181819], [6.0, 6.0, 1.2727272727272727], [7.0, 7.0, 1.3636363636363635], [8.0, 8.0, 1.4090909090909092], [9.0, 9.0, 1.5], [10.0, 10.0, 1.5909090909090908], [11.0, 11.0, 1.6818181818181819], [12.0, 12.0, 1.75], [13.0, 13.0, 1.8181818181818181], [14.0, 14.0, 1.9090909090909092], [15.0, 15.0, 1.9772727272727273], [16.0, 16.0, 2.0454545454545454], [17.0, 17.0, 2.159090909090909], [18.0, 18.0, 2.227272727272727], [19.0, 19.0, 2.3181818181818183], [20.0, 20.0, 2.409090909090909], [21.0, 21.0, 2.4545454545454546], [22.0, 22.0, 2.5454545454545454], [23.0, 23.0, 2.6363636363636362], [24.0, 24.0, 2.6818181818181817], [25.0, 25.0, 2.8181818181818183], [26.0, 26.0, 2.8636363636363638], [27.0, 27.0, 2.9545454545454546], [28.0, 28.0, 3.0454545454545454], [29.0, 29.0, 3.090909090909091], [30.0, 30.0, 3.1818181818181817], [31.0, 33.0, 3.3181818181818183], [34.0, 36.0, 3.5454545454545454], [37.0, 39.0, 3.727272727272727], [40.0, 42.0, 3.9545454545454546], [43.0, 45.0, 4.136363636363637], [46.0, 48.0, 4.363636363636363], [49.0, 51.0, 4.590909090909091], [52.0, 54.0, 4.7272727272727275], [55.0, 57.0, 4.863636363636363], [58.0, 60.0, 5.045454545454546], [61.0, 65.0, 5.2272727272727275], [66.0, 70.0, 5.454545454545454], [71.0, 75.0, 5.7272727272727275], [76.0, 80.0, 6.0], [81.0, 85.0, 6.2272727272727275], [86.0, 90.0, 6.5], [91.0, 95.0, 6.7272727272727275], [96.0, 100.0, 6.954545454545454], [101.0, 105.0, 7.2727272727272725], [106.0, 110.0, 7.5], [111.0, 115.0, 7.7727272727272725], [116.0, 120.0, 8.045454545454545], [121.0, 125.0, 8.227272727272727], [126.0, 130.0, 8.5], [131.0, 135.0, 8.727272727272727], [136.0, 140.0, 9.0], [141.0, 145.0, 9.227272727272727], [146.0, 150.0, 9.590909090909092], [151.0, 155.0, 9.727272727272727], [156.0, 160.0, 10.0], [161.0, 165.0, 10.227272727272727], [166.0, 170.0, 10.5], [171.0, 175.0, 10.727272727272727], [176.0, 180.0, 11.0], [181.0, 185.0, 11.181818181818182], [186.0, 190.0, 11.5], [191.0, 195.0, 11.727272727272727], [196.0, 999.0, 12.0]];
 
-    const campussen = [
-      { adres: 'Moorselbaan 164, 9300 Aalst' },
-      { adres: 'Merestraat 80, 9300 Aalst' },
-      { adres: 'Bloklaan 5, 1730 Asse' },
-      { adres: 'Gasthuisstraat 4, 9500 Geraardsbergen' },
-      { adres: 'Biezenstraat 2, 9400 Ninove' },
-      { adres: 'Wegvoeringstraat 73, 9230 Wetteren' }
-    ];
+const campussen = [
+  { adres: 'Moorselbaan 164, 9300 Aalst' },
+  { adres: 'Merestraat 80, 9300 Aalst' },
+  { adres: 'Bloklaan 5, 1730 Asse' },
+  { adres: 'Gasthuisstraat 4, 9500 Geraardsbergen' },
+  { adres: 'Biezenstraat 2, 9400 Ninove' },
+  { adres: 'Wegvoeringstraat 73, 9230 Wetteren' }
+];
 
-    const elApiKey = document.getElementById('apiKey');
-    const elOrigin = document.getElementById('origin');
-    const elBtnGeo = document.getElementById('btnGeocodeOrigin');
-    const elBtnCalc = document.getElementById('btnCalculate');
-    const elTBody = document.querySelector('#results tbody');
-    const elErrors = document.getElementById('errors');
+const elApiKey = document.getElementById('apiKey');
+const elOrigin = document.getElementById('origin');
+const elBtnGeo = document.getElementById('btnGeocodeOrigin');
+const elBtnCalc = document.getElementById('btnCalculate');
+const elTBody = document.querySelector('#results tbody');
+const elErrors = document.getElementById('errors');
 
-    function renderInitialTable() {
-      elTBody.innerHTML = '';
-      campussen.forEach((c, idx) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${idx + 1}</td>
-          <td>${escapeHtml(c.adres)}</td>
-          <td class="auto">—</td>
-          <td class="fiets">—</td>
-          <td class="autoVergoeding">—</td>
-          <td class="fietsVergoeding">—</td>
-        `;
-        elTBody.appendChild(tr);
-      });
-    }
-    renderInitialTable();
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (s) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[s]));
+}
 
-    function escapeHtml(str) {
-      return str.replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
-    }
+function showError(msg) {
+  const div = document.createElement('div');
+  div.className = 'error';
+  div.textContent = msg;
+  elErrors.appendChild(div);
+  setTimeout(() => div.remove(), 8000);
+}
 
-    function showError(msg) {
-      const div = document.createElement('div');
-      div.className = 'error';
-      div.textContent = msg;
-      elErrors.appendChild(div);
-      setTimeout(() => div.remove(), 8000);
-    }
+function euro(x) {
+  if (!isFinite(x)) return '—';
+  return `€ ${x.toFixed(2).replace('.', ',')}`;
+}
 
-    async function geocode(text, apiKey) {
-      const url = 'https://api.openrouteservice.org/geocode/search';
-      const params = new URLSearchParams({ text, size: '1', lang: 'nl' }).toString();
-      const res = await fetch(`${url}?${params}`, {
-        headers: { 'Authorization': apiKey }
-      });
-      if (!res.ok) throw new Error(`Geocoding mislukt (${res.status})`);
-      const data = await res.json();
-      const feat = data.features?.[0];
-      if (!feat) throw new Error('Geen geocode‑resultaat gevonden');
-      const [lon, lat] = feat.geometry.coordinates;
-      return { lat, lon };
-    }
+function formatKm(meters) { return (meters / 1000).toFixed(2); }
 
-    async function route(origin, destination, profile, apiKey) {
-      const url = `https://api.openrouteservice.org/v2/directions/${profile}`;
-      const body = {
-        coordinates: [
-          [origin.lon, origin.lat],
-          [destination.lon, destination.lat]
-        ]
-      };
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': apiKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      });
-      if (!res.ok) throw new Error(`Route mislukt (${profile}, ${res.status})`);
-      const data = await res.json();
-      const seg = data.routes?.[0]?.summary;
-      if (!seg) throw new Error('Geen route‑samenvatting ontvangen');
-      return { meters: seg.distance, seconds: seg.duration };
-    }
+function formatTime(seconds) {
+  const mins = Math.round(seconds / 60);
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h} u ${m} min`;
+}
 
-    function formatKm(meters) { return (meters / 1000).toFixed(2); }
-    function formatTime(seconds) {
-      const mins = Math.round(seconds / 60);
-      if (mins < 60) return `${mins} min`;
-      const h = Math.floor(mins / 60);
-      const m = mins % 60;
-      return `${h} u ${m} min`;
-    }
-    function calcAutoVergoeding(km) { return km < MIN_AUTO_KM ? 0 : km * AUTO_TARIEF; }
-    function calcFietsVergoeding(km) { return km * 2 * FIETS_TARIEF; }
-    function euro(x) { return `€ ${x.toFixed(2).replace('.', ',')}`; }
+// Lookup dagvergoeding op basis van afstand (km, enkel traject)
+// We ronden naar boven (ceil) zodat 4,01 km in de schijf 5 km valt (niet 4 km).
+function dagvergoedingVoorKm(km) {
+  const k = Math.max(0, Math.ceil(km));
+  for (const [from, to, perDag] of SOCIAAL_TARIEVEN) {
+    if (k >= from && k <= to) return perDag;
+  }
+  // fallback (zou niet moeten gebeuren door laatste 196-999)
+  return 0;
+}
 
-    elBtnGeo.addEventListener('click', async () => {
-      elBtnGeo.disabled = true;
-      elBtnCalc.disabled = true;
+function makeWerkdagenSelect(defaultVal = 22) {
+  const sel = document.createElement('select');
+  sel.className = 'werkdagenSelect';
+  for (let i = 1; i <= 31; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = String(i);
+    if (i === defaultVal) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  return sel;
+}
+
+function updateRowVergoedingen(row) {
+  const days = parseInt(row.querySelector('.werkdagenSelect')?.value || '22', 10);
+  const autoPerDag = parseFloat(row.dataset.autoPerDag || '0');
+  const fietsPerDag = parseFloat(row.dataset.fietsPerDag || '0');
+
+  const tdAutoVer = row.querySelector('.autoVergoeding');
+  const tdFietsVer = row.querySelector('.fietsVergoeding');
+
+  if (tdAutoVer) tdAutoVer.textContent = `${euro(autoPerDag)}/dag — ${euro(autoPerDag * days)}`;
+  if (tdFietsVer) tdFietsVer.textContent = `${euro(fietsPerDag)}/dag — ${euro(fietsPerDag * days)}`;
+}
+
+function renderInitialTable() {
+  elTBody.innerHTML = '';
+  campussen.forEach((c, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td>${escapeHtml(c.adres)}</td>
+      <td class="auto">—</td>
+      <td class="fiets">—</td>
+      <td class="autoVergoeding">—</td>
+      <td class="fietsVergoeding">—</td>
+      <td class="werkdagen"></td>
+    `;
+
+    const tdWerkdagen = tr.querySelector('.werkdagen');
+    const sel = makeWerkdagenSelect(22);
+    sel.addEventListener('change', () => updateRowVergoedingen(tr));
+    tdWerkdagen.appendChild(sel);
+
+    elTBody.appendChild(tr);
+  });
+}
+renderInitialTable();
+
+async function geocode(text, apiKey) {
+  const url = 'https://api.openrouteservice.org/geocode/search';
+  const params = new URLSearchParams({ text, size: '1', lang: 'nl' }).toString();
+  const res = await fetch(`${url}?${params}`, {
+    headers: { 'Authorization': apiKey }
+  });
+  if (!res.ok) throw new Error(`Geocoding mislukt (${res.status})`);
+  const data = await res.json();
+  const feat = data.features?.[0];
+  if (!feat) throw new Error('Geen geocode-resultaat gevonden');
+  const [lon, lat] = feat.geometry.coordinates;
+  return { lat, lon };
+}
+
+async function route(origin, destination, profile, apiKey) {
+  const url = `https://api.openrouteservice.org/v2/directions/${profile}`;
+  const body = {
+    coordinates: [
+      [origin.lon, origin.lat],
+      [destination.lon, destination.lat]
+    ]
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': apiKey,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`Route mislukt (${profile}, ${res.status})`);
+  const data = await res.json();
+  const seg = data.routes?.[0]?.summary;
+  if (!seg) throw new Error('Geen route-samenvatting ontvangen');
+  return { meters: seg.distance, seconds: seg.duration };
+}
+
+elBtnGeo.addEventListener('click', async () => {
+  elBtnGeo.disabled = true;
+  elBtnCalc.disabled = true;
+  try {
+    const apiKey = (elApiKey.value || '').trim();
+    const originText = (elOrigin.value || '').trim();
+    if (!apiKey) throw new Error('Vul je OpenRouteService API-key in.');
+    if (!originText) throw new Error('Vul je vertrekadres in.');
+    window.__origin = await geocode(originText, apiKey);
+    elBtnCalc.disabled = false;
+  } catch (err) {
+    showError(err.message || String(err));
+  } finally {
+    elBtnGeo.disabled = false;
+  }
+});
+
+elBtnCalc.addEventListener('click', async () => {
+  elBtnCalc.disabled = true;
+  try {
+    const apiKey = (elApiKey.value || '').trim();
+    const origin = window.__origin;
+    if (!origin) throw new Error('Geocodeer eerst je vertrekadres.');
+
+    // Geocode campussen
+    const dests = [];
+    for (const c of campussen) {
       try {
-        const apiKey = (elApiKey.value || '').trim();
-        const originText = (elOrigin.value || '').trim();
-        if (!apiKey) throw new Error('Vul je OpenRouteService API‑key in.');
-        if (!originText) throw new Error('Vul je vertrekadres in.');
-        window.__origin = await geocode(originText, apiKey);
-        elBtnCalc.disabled = false;
-      } catch (err) {
-        showError(err.message || String(err));
-      } finally {
-        elBtnGeo.disabled = false;
+        const geo = await geocode(c.adres, apiKey);
+        dests.push({ ...c, geo });
+      } catch (e) {
+        dests.push({ ...c, geo: null, error: e.message });
       }
-    });
+    }
 
-    elBtnCalc.addEventListener('click', async () => {
-      elBtnCalc.disabled = true;
+    const rows = Array.from(elTBody.querySelectorAll('tr'));
+
+    for (let i = 0; i < dests.length; i++) {
+      const row = rows[i];
+      const dest = dests[i];
+      const tdAuto = row.querySelector('.auto');
+      const tdFiets = row.querySelector('.fiets');
+
+      // reset perDag
+      row.dataset.autoPerDag = '0';
+      row.dataset.fietsPerDag = '0';
+
+      if (!dest.geo) {
+        tdAuto.textContent = '—';
+        tdFiets.textContent = '—';
+        showError(`Geocoding mislukt voor: ${dest.adres} (${dest.error})`);
+        updateRowVergoedingen(row);
+        continue;
+      }
+
+      // Auto route
       try {
-        const apiKey = (elApiKey.value || '').trim();
-        const origin = window.__origin;
-        if (!origin) throw new Error('Geocodeer eerst je vertrekadres.');
-
-        const dests = [];
-        for (const c of campussen) {
-          try {
-            const geo = await geocode(c.adres, apiKey);
-            dests.push({ ...c, geo });
-          } catch (e) {
-            dests.push({ ...c, geo: null, error: e.message });
-          }
-        }
-
-        const rows = Array.from(elTBody.querySelectorAll('tr'));
-        for (let i = 0; i < dests.length; i++) {
-          const row = rows[i];
-          const dest = dests[i];
-          const tdAuto = row.querySelector('.auto');
-          const tdFiets = row.querySelector('.fiets');
-          const tdAutoVer = row.querySelector('.autoVergoeding');
-          const tdFietsVer = row.querySelector('.fietsVergoeding');
-
-          if (!dest.geo) {
-            tdAuto.textContent = '—';
-            tdFiets.textContent = '—';
-            tdAutoVer.textContent = '—';
-            tdFietsVer.textContent = '—';
-            showError(`Geocoding mislukt voor: ${dest.adres} (${dest.error})`);
-            continue;
-          }
-
-          try {
-            const ra = await route(origin, dest.geo, 'driving-car', apiKey);
-            const kmA = parseFloat(formatKm(ra.meters));
-            tdAuto.textContent = `${kmA} km — ${formatTime(ra.seconds)}`;
-            tdAutoVer.textContent = euro(calcAutoVergoeding(kmA));
-          } catch (e) {
-            tdAuto.textContent = '—';
-            tdAutoVer.textContent = '—';
-            showError(`Route (auto) mislukt voor: ${dest.adres} (${e.message})`);
-          }
-
-          try {
-            const rf = await route(origin, dest.geo, 'cycling-regular', apiKey);
-            const kmF = parseFloat(formatKm(rf.meters));
-            tdFiets.textContent = `${kmF} km — ${formatTime(rf.seconds)}`;
-            tdFietsVer.textContent = euro(calcFietsVergoeding(kmF));
-          } catch (e) {
-            tdFiets.textContent = '—';
-            tdFietsVer.textContent = '—';
-            showError(`Route (fiets) mislukt voor: ${dest.adres} (${e.message})`);
-          }
-        }
-      } catch (err) {
-        showError(err.message || String(err));
-      } finally {
-        elBtnCalc.disabled = false;
+        const ra = await route(origin, dest.geo, 'driving-car', apiKey);
+        const kmA = parseFloat(formatKm(ra.meters));
+        tdAuto.textContent = `${kmA} km — ${formatTime(ra.seconds)}`;
+        row.dataset.autoPerDag = String(dagvergoedingVoorKm(kmA));
+      } catch (e) {
+        tdAuto.textContent = '—';
+        showError(`Route (auto) mislukt voor: ${dest.adres} (${e.message})`);
       }
-    });
-  </script>
+
+      // Fiets route
+      try {
+        const rf = await route(origin, dest.geo, 'cycling-regular', apiKey);
+        const kmF = parseFloat(formatKm(rf.meters));
+        tdFiets.textContent = `${kmF} km — ${formatTime(rf.seconds)}`;
+        row.dataset.fietsPerDag = String(dagvergoedingVoorKm(kmF));
+      } catch (e) {
+        tdFiets.textContent = '—';
+        showError(`Route (fiets) mislukt voor: ${dest.adres} (${e.message})`);
+      }
+
+      updateRowVergoedingen(row);
+    }
+
+  } catch (err) {
+    showError(err.message || String(err));
+  } finally {
+    elBtnCalc.disabled = false;
+  }
+});
+</script>
+
 </body>
 </html>
